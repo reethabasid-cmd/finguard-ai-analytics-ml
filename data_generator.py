@@ -66,8 +66,6 @@ category_multipliers = pd.Series(categories).map({
 amount = rng.lognormal(mean=3.45, sigma=0.85, size=rows) * category_multipliers
 amount = np.clip(amount, 2.0, 8_000.0)
 
-#### Fraud likelihood is driven by behavior, not by a fixed random label.
-
 logit = (
 -4.25
 + 2.7 * device_risk
@@ -78,9 +76,7 @@ logit = (
 + 0.55 * np.isin(payment_methods, ["digital_wallet", "buy_now_pay_later"])
 )
 probability = 1.0 / (1.0 + np.exp(-logit))
-is_fraud = rng.binomial(1, probability) 
-
-#### Normalize prevalence to approximately 4%, retaining behavioral patterns.
+is_fraud = rng.binomial(1, probability)
 
 fraud_count = max(1, round(rows * 0.04))
 if int(is_fraud.sum()) > fraud_count:
@@ -93,9 +89,7 @@ eligible = np.flatnonzero(is_fraud == 0)
 extra = rng.choice(
 eligible, size=fraud_count - int(is_fraud.sum()), replace=False
 )
-is_fraud[extra] = 1 
-
-#### Fraud cases have realistic signals that the model can learn.
+is_fraud[extra] = 1
 
 fraud_mask = is_fraud == 1
 device_risk[fraud_mask] = np.maximum(
@@ -107,7 +101,7 @@ frequency[fraud_mask], rng.integers(5, 15, fraud_mask.sum())
 account_age[fraud_mask] = np.minimum(
 account_age[fraud_mask], rng.integers(1, 120, fraud_mask.sum())
 )
-amount[fraud_mask] *= rng.uniform(1.3, 3.2, fraud_mask.sum()) 
+amount[fraud_mask] *= rng.uniform(1.3, 3.2, fraud_mask.sum())
 
 frame = pd.DataFrame({
 "transaction_id": [f"TX-{i:08d}" for i in range(1, rows + 1)],
@@ -121,10 +115,9 @@ frame = pd.DataFrame({
 "tx_frequency_24h": frequency.astype(int),
 "device_risk_score": np.round(device_risk, 4),
 "is_fraud": is_fraud.astype(int),
-}) 
+})
 
 if inject_flaws:
-# Keep defects in a small, auditable proportion of raw data.
 for column, rate in {
 "merchant_category": 0.006,
 "region": 0.004,
@@ -133,8 +126,7 @@ for column, rate in {
 "device_risk_score": 0.003,
 }.items():
 indices = rng.choice(rows, size=max(1, round(rows * rate)), replace=False)
-frame.loc[indices, column] = np.nan 
-
+frame.loc[indices, column] = np.nan
 negative_indices = rng.choice(rows, size=max(1, round(rows * 0.002)), replace=False)
 frame.loc[negative_indices, "amount"] = -frame.loc[negative_indices, "amount"].abs()
 
